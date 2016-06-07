@@ -1,5 +1,7 @@
 # MicrosoftRootProgram
 
+**Information gathered from [Ryan Hurst's blog](https://unmitigatedrisk.com/?p=259). Bookmark it.**
+
 You need:
 * cabextract
 * perl with Convert::ASN1, JSON, and Text::Iconv modules
