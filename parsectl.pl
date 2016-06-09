@@ -152,10 +152,11 @@ if (defined $ctl) {
       }
 
       # OID_CERT_PROP_ID_PREFIX_98
+      # Seems to be a SHA256 digest of the certificate (thanks @pzb)
       if ($MD->{'MetaDataType'} eq "1.3.6.1.4.1.311.10.11.98")
       {
         my $Thing = uc(unpack("H*", $MD->{'MetaDataValue'}->{'RealContent'}));
-	$MD->{'PropID98'} = $Thing;
+	$MD->{'SHA256Digest'} = $Thing;
 	delete $MD->{'MetaDataType'};
 	delete $MD->{'MetaDataValue'};
       }
