@@ -49,6 +49,13 @@ my $asn_evoids = $asn->find('EVOIDS');
 my $object = "";
 my $converter = Text::Iconv->new("UTF-16LE", "UTF-8");
 
+sub printctl {
+  my ($ctl) = @_;
+
+
+  print to_json($ctl, { pretty => 1 });
+}
+
 # Read the whole CTL as a blob
 while (<>) {
   $object = $object . $_;
@@ -65,9 +72,6 @@ if (defined $ctl) {
   $ctl->{'GenDate'} = scalar gmtime($ctl->{'GenDate'});
 
   my @Entries = @{$ctl->{'InnerCTL'}};
-  # Display the number of entries. Remove it if you really need to
-  # parse the JSON output
-  print "Entries: ", $#Entries, "\n";
 
   # We'll alter every CTL entry
   foreach my $Entry (@Entries) {
@@ -178,7 +182,7 @@ if (defined $ctl) {
     }
   }
 
-  # Pretty print the result as a JSON stuff
-  print to_json($ctl, { pretty => 1 });
+  # Pretty print the result
+  printctl($ctl);
 }
 
