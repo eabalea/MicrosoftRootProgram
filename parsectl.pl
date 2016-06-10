@@ -6,6 +6,10 @@ use utf8;
 use Convert::ASN1 qw(:io :debug);
 use JSON;
 use Text::Iconv;
+use Getopt::Std;
+
+my %opts;
+getopts('t', \%opts);
 
 # ASN.1 descriptions of the objects we're going to parse
 my $asn = Convert::ASN1->new;
@@ -52,8 +56,35 @@ my $converter = Text::Iconv->new("UTF-16LE", "UTF-8");
 sub printctl {
   my ($ctl) = @_;
 
+  if (defined $opts{'t'}) {
+    my @Entries = @{$ctl->{'InnerCTL'}};
+    @Entries = sort { $a->{'CertID'} cmp $b->{'CertID'} } @Entries;
+    print "Entries: ", $#Entries, "\n";
+    print "GenDate: ", $ctl->{'GenDate'}, "\n";
+    print "UnknownInt: ", $ctl->{'UnknownInt'}, "\n";
+    print "\n";
 
+    foreach my $Entry (@Entries) {
+      my %metadata;
+      print "CertID: ", $Entry->{'CertID'}, "\n";
+      print "URLToCert: ", $Entry->{'URLToCert'}, "\n";
+      foreach my $MD (@{$Entry->{'MetaData'}}) {
+        $metadata{'MetaEKUS'} = join(", ", sort @{$MD->{'MetaEKUS'}}) if defined $MD->{'MetaEKUS'};
+        $metadata{'CertFriendlyName'} = $MD->{'CertFriendlyName'} if defined $MD->{'CertFriendlyName'};
+        $metadata{'CertKeyIdentifier'} = $MD->{'CertKeyIdentifier'} if defined $MD->{'CertKeyIdentifier'};
+        $metadata{'CertSubjectNameMD5Hash'} = $MD->{'CertSubjectNameMD5Hash'} if defined $MD->{'CertSubjectNameMD5Hash'};
+        $metadata{'SHA256Digest'} = $MD->{'SHA256Digest'} if defined $MD->{'SHA256Digest'};
+        $metadata{'EVOIDS'} = join(", ", sort @{$MD->{'EVOIDS'}}) if defined $MD->{'EVOIDS'};
+        $metadata{'PropID105'} = join(", ", sort @{$MD->{'PropID105'}}) if defined $MD->{'PropID105'};
+      }
+      foreach my $metadata (sort keys %metadata) {
+        print "$metadata: $metadata{$metadata}\n";
+      }
+      print "\n";
+    }
+  } else {
   print to_json($ctl, { pretty => 1 });
+  }
 }
 
 # Read the whole CTL as a blob
