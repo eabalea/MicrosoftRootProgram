@@ -168,6 +168,7 @@ if (defined $ctl) {
 	# different OIDs (always the same)
 	my $Thing = $asn_ekus->decode($MD->{'MetaDataValue'}->{'RealContent'});
 	foreach my $oid (@$Thing) {
+	  $oid =~ s/1\.3\.6\.1\.4\.1\.311\.60\.3\.2/ROOT_PROGRAM_AUTO_UPDATE_END_REVOCATION/;
 	  $oid =~ s/1\.3\.6\.1\.4\.1\.311/OID-Microsoft/;
 	}
 	$MD->{'PropID105'} = $Thing;
