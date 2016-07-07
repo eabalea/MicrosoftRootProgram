@@ -4,7 +4,7 @@
 
 You need:
 * cabextract
-* perl with Convert::ASN1, JSON, and Text::Iconv modules
+* perl with Convert::ASN1, JSON, Text::Iconv, and DateTime modules
 
 Run ./getitall.sh to download the authrootstl.cab file (which contains
 all the Root Certificates trusted by Microsoft), and extract its

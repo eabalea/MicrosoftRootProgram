@@ -7,6 +7,7 @@ use Convert::ASN1 qw(:io :debug);
 use JSON;
 use Text::Iconv;
 use Getopt::Std;
+use DateTime;
 
 my %opts;
 getopts('t', \%opts);
@@ -75,7 +76,9 @@ sub printctl {
         $metadata{'CertSubjectNameMD5Hash'} = $MD->{'CertSubjectNameMD5Hash'} if defined $MD->{'CertSubjectNameMD5Hash'};
         $metadata{'SHA256Digest'} = $MD->{'SHA256Digest'} if defined $MD->{'SHA256Digest'};
         $metadata{'EVOIDS'} = join(", ", sort @{$MD->{'EVOIDS'}}) if defined $MD->{'EVOIDS'};
+        $metadata{'DisallowedOn'} = $MD->{'DisallowedOn'} if defined $MD->{'DisallowedOn'};
         $metadata{'PropID105'} = join(", ", sort @{$MD->{'PropID105'}}) if defined $MD->{'PropID105'};
+        $metadata{'PropID122'} = join(", ", sort @{$MD->{'PropID122'}}) if defined $MD->{'PropID122'};
       }
       foreach my $metadata (sort keys %metadata) {
         print "$metadata: $metadata{$metadata}\n";
@@ -85,6 +88,29 @@ sub printctl {
   } else {
   print to_json($ctl, { pretty => 1 });
   }
+}
+
+sub friendlynameOID {
+  my ($oid) = @_;
+
+  $oid = "id-kp-serverAuth"      if ($oid eq "1.3.6.1.5.5.7.3.1");
+  $oid = "id-kp-clientAuth"      if ($oid eq "1.3.6.1.5.5.7.3.2");
+  $oid = "id-kp-codeSigning"     if ($oid eq "1.3.6.1.5.5.7.3.3");
+  $oid = "id-kp-emailProtection" if ($oid eq "1.3.6.1.5.5.7.3.4");
+  $oid = "id-kp-ipsecEndSystem"  if ($oid eq "1.3.6.1.5.5.7.3.5");
+  $oid = "id-kp-ipsecTunnel"     if ($oid eq "1.3.6.1.5.5.7.3.6");
+  $oid = "id-kp-ipsecUser"       if ($oid eq "1.3.6.1.5.5.7.3.7");
+  $oid = "id-kp-timeStamping"    if ($oid eq "1.3.6.1.5.5.7.3.8");
+  $oid = "id-kp-ocspSigning"     if ($oid eq "1.3.6.1.5.5.7.3.9");
+  $oid = "iKEIntermediate"       if ($oid eq "1.3.6.1.5.5.8.2.2");
+  $oid = "ms-EFS-CRYPTO"         if ($oid eq "1.3.6.1.4.1.311.10.3.4");
+  $oid = "ms-EFS-RECOVERY"       if ($oid eq "1.3.6.1.4.1.311.10.3.4.1");
+  $oid = "ms-DOCUMENT-SIGNING"   if ($oid eq "1.3.6.1.4.1.311.10.3.12");
+  $oid = "ms-smartCardLogon"     if ($oid eq "1.3.6.1.4.1.311.20.2.2");
+  $oid =~ s/1\.3\.6\.1\.4\.1\.311\.60\.3\.2/ROOT_PROGRAM_AUTO_UPDATE_END_REVOCATION/;
+  $oid =~ s/1\.3\.6\.1\.4\.1\.311/OID-Microsoft/;
+
+  return $oid;
 }
 
 # Read the whole CTL as a blob
@@ -120,21 +146,7 @@ if (defined $ctl) {
       {
 	my $ekus = $asn_ekus->decode($MD->{'MetaDataValue'}->{'RealContent'});
 	foreach my $eku (@$ekus) {
-	  $eku = "id-kp-serverAuth"      if ($eku eq "1.3.6.1.5.5.7.3.1");
-	  $eku = "id-kp-clientAuth"      if ($eku eq "1.3.6.1.5.5.7.3.2");
-	  $eku = "id-kp-codeSigning"     if ($eku eq "1.3.6.1.5.5.7.3.3");
-	  $eku = "id-kp-emailProtection" if ($eku eq "1.3.6.1.5.5.7.3.4");
-	  $eku = "id-kp-ipsecEndSystem"  if ($eku eq "1.3.6.1.5.5.7.3.5");
-	  $eku = "id-kp-ipsecTunnel"     if ($eku eq "1.3.6.1.5.5.7.3.6");
-	  $eku = "id-kp-ipsecUser"       if ($eku eq "1.3.6.1.5.5.7.3.7");
-	  $eku = "id-kp-timeStamping"    if ($eku eq "1.3.6.1.5.5.7.3.8");
-	  $eku = "id-kp-ocspSigning"     if ($eku eq "1.3.6.1.5.5.7.3.9");
-	  $eku = "iKEIntermediate"       if ($eku eq "1.3.6.1.5.5.8.2.2");
-
-	  $eku = "ms-EFS-CRYPTO"         if ($eku eq "1.3.6.1.4.1.311.10.3.4");
-	  $eku = "ms-EFS-RECOVERY"       if ($eku eq "1.3.6.1.4.1.311.10.3.4.1");
-	  $eku = "ms-DOCUMENT-SIGNING"   if ($eku eq "1.3.6.1.4.1.311.10.3.12");
-	  $eku = "ms-smartCardLogon"     if ($eku eq "1.3.6.1.4.1.311.20.2.2");
+	  $eku = friendlynameOID($eku);
 	}
 	$MD->{'MetaEKUS'} = $ekus; 
 	delete $MD->{'MetaDataType'};
@@ -196,6 +208,35 @@ if (defined $ctl) {
 	delete $MD->{'MetaDataValue'};
       }
 
+      # OID_CERT_PROP_ID_PREFIX_104
+      # May be future date disallow (Win10)
+      # I consider this to be a 64bits little-endian Windows filetime
+      # (100-nanoseconds interval that have elapsed since 12:00 AM
+      # January 1, 1601 UTC)
+      # Divide the number by 10000000, add this to the aforementioned
+      # date, get the resulting UTC date. Leapseconds aren't probably counted.
+      if ($MD->{'MetaDataType'} eq "1.3.6.1.4.1.311.10.11.104")
+      {
+	my $HundredsNanoSec = unpack("Q<", $MD->{'MetaDataValue'}->{'RealContent'});
+	my $Seconds = $HundredsNanoSec / 10000000;
+
+        my $dt = DateTime->new(
+          year       => 1601,
+          month      => 01,
+          day        => 01,
+          hour       => 00,
+          minute     => 00,
+          second     => 00,
+          nanosecond => 00,
+          time_zone  => 'UTC');
+
+        $dt->add( seconds => $Seconds);
+
+	$MD->{'DisallowedOn'} = $dt->day_abbr ." ". $dt->month_abbr ." ". $dt->day ." ". $dt->hms ." ". $dt->year;
+	delete $MD->{'MetaDataType'};
+	delete $MD->{'MetaDataValue'};
+      }
+
       # OID_CERT_PROP_ID_PREFIX_105
       if ($MD->{'MetaDataType'} eq "1.3.6.1.4.1.311.10.11.105")
       {
@@ -203,10 +244,23 @@ if (defined $ctl) {
 	# different OIDs (always the same)
 	my $Thing = $asn_ekus->decode($MD->{'MetaDataValue'}->{'RealContent'});
 	foreach my $oid (@$Thing) {
-	  $oid =~ s/1\.3\.6\.1\.4\.1\.311\.60\.3\.2/ROOT_PROGRAM_AUTO_UPDATE_END_REVOCATION/;
-	  $oid =~ s/1\.3\.6\.1\.4\.1\.311/OID-Microsoft/;
+	  $oid = friendlynameOID($oid);
 	}
 	$MD->{'PropID105'} = $Thing;
+	delete $MD->{'MetaDataType'};
+	delete $MD->{'MetaDataValue'};
+      }
+
+      # OID_CERT_PROP_ID_PREFIX_122
+      # May be EKU disallow
+      if ($MD->{'MetaDataType'} eq "1.3.6.1.4.1.311.10.11.122")
+      {
+        # It's structured the same way as the METAEKUS
+	my $Thing = $asn_ekus->decode($MD->{'MetaDataValue'}->{'RealContent'});
+	foreach my $oid (@$Thing) {
+	  $oid = friendlynameOID($oid);
+	}
+	$MD->{'PropID122'} = $Thing;
 	delete $MD->{'MetaDataType'};
 	delete $MD->{'MetaDataValue'};
       }
