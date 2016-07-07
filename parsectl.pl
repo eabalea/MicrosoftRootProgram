@@ -113,6 +113,26 @@ sub friendlynameOID {
   return $oid;
 }
 
+sub convertFileTime {
+  my ($binaryFT) = @_;
+  my $HundredsNanoSec = unpack("Q<", $binaryFT);
+  my $Seconds = $HundredsNanoSec / 10000000;
+
+  my $dt = DateTime->new(
+    year       => 1601,
+    month      => 01,
+    day        => 01,
+    hour       => 00,
+    minute     => 00,
+    second     => 00,
+    nanosecond => 00,
+    time_zone  => 'floating');
+
+  $dt->add( seconds => $Seconds );
+
+  return $dt->day_abbr ." ". $dt->month_abbr ." ". $dt->day ." ". $dt->hms ." ". $dt->year;
+}
+
 # Read the whole CTL as a blob
 while (<>) {
   $object = $object . $_;
@@ -217,22 +237,7 @@ if (defined $ctl) {
       # date, get the resulting UTC date. Leapseconds aren't probably counted.
       if ($MD->{'MetaDataType'} eq "1.3.6.1.4.1.311.10.11.104")
       {
-	my $HundredsNanoSec = unpack("Q<", $MD->{'MetaDataValue'}->{'RealContent'});
-	my $Seconds = $HundredsNanoSec / 10000000;
-
-        my $dt = DateTime->new(
-          year       => 1601,
-          month      => 01,
-          day        => 01,
-          hour       => 00,
-          minute     => 00,
-          second     => 00,
-          nanosecond => 00,
-          time_zone  => 'UTC');
-
-        $dt->add( seconds => $Seconds);
-
-	$MD->{'DisallowedOn'} = $dt->day_abbr ." ". $dt->month_abbr ." ". $dt->day ." ". $dt->hms ." ". $dt->year;
+	$MD->{'DisallowedOn'} = convertFileTime($MD->{'MetaDataValue'}->{'RealContent'});
 	delete $MD->{'MetaDataType'};
 	delete $MD->{'MetaDataValue'};
       }
